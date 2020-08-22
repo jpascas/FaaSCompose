@@ -42,6 +42,7 @@ const FuncEditor = (props): JSX.Element => {
       console.log(response);
       setTimeout(function () {
         props.toggle();
+        props.refreshFuncs();        
       }, 2000);
     });
   };

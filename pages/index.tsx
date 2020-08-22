@@ -6,7 +6,7 @@ import FlowButtons from '../components/FlowStructureButton';
 //import FunctionButtons from '../components/FunctionStructureButtons';
 
 import React, {
-  useState,
+  useState, useEffect,
   // useEffect,
   // useReducer,
   // useContext,
@@ -19,20 +19,36 @@ import Execution from '../components/Execution/Execution';
 
 const Home = (): JSX.Element => {
   const [sequence, setSequence] = useState('');
-  const [functions, setFunctions] = useState('');
+  const [currentFuncs, setFuncs] = useState({});
   const [showEditor, setShowEditor] = useState(false);
+  const [currentFunc, setCurrentFunc] = useState('');
 
   const [flowState, setflowState] = useState('');
   const sequenceChange = (el) => {
     setSequence(el);
-    setFunctions('');
+    setCurrentFunc('');
   };
 
   const toggleFuncEditor = () => {
     setShowEditor(!showEditor);
   };
 
-  const functionsChange = (el) => setFunctions(el);
+  const functionsChange = (el) => setCurrentFunc(el);
+  const getFuncs = () => {
+    fetch('/api/functions/read-functions', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setFuncs(data);
+      });
+  };
+  useEffect(() => {
+    getFuncs();
+  }, []);
   const onSaveClick = async (flow) => {
     const res = await fetch(
       `http://localhost:3000/api/composition/agnosticsave/${flow.name}`,
@@ -61,7 +77,7 @@ const Home = (): JSX.Element => {
             <hr />
             <FunctionInventory
               onClick={functionsChange}
-              functions={functions}
+              functions={currentFuncs}
               toggleFuncEditor={toggleFuncEditor}
             />
             {/* <FunctionButtons  onClick={functionsChange} functions={functions}/> */}
@@ -69,12 +85,12 @@ const Home = (): JSX.Element => {
           <Col xs={9} md={9} lg={7} className="mt-5 ml-4 mr-4 main">
             <BasicFlow
               type={sequence}
-              functionNames={functions}
+              functionNames={currentFuncs}
               onSave={onSaveClick}
             />
             <Execution compositionName={flowState.name} />
           </Col>
-          <FuncEditor show={showEditor} toggle={toggleFuncEditor} />
+          <FuncEditor show={showEditor} toggle={toggleFuncEditor} refreshFuncs = {getFuncs} />
         </Row>
       </Container>
     </div>

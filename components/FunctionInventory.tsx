@@ -10,27 +10,12 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit } from '@fortawesome/free-solid-svg-icons';
 
-const FunctionInventory = (props) => {
-  const [currentFuncs, setFuncs] = useState({});
+const FunctionInventory = (props) => {  
   const [buttons, setButtons] = useState();
-
   let funcs = [];
 
-  const getFuncs = () => {
-    fetch('/api/functions/read-functions', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setFuncs(data);
-      });
-  };
-  useEffect(() => {
-    getFuncs();
-  }, []);
+ 
+  const currentFuncs = props.functions;
 
   Object.keys(currentFuncs).map((func) => {
     funcs.push(
@@ -77,7 +62,7 @@ const FunctionInventory = (props) => {
           <Button
             variant="primary"
             className="mt-4"
-            onClick={props.toggleFuncEditor}
+            onClick={props.toggleFuncEditor}            
           >
             New Function
           </Button>
