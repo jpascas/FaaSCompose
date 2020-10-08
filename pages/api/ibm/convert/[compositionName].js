@@ -4,9 +4,7 @@ const fs = require('fs');
 const shell = require('shelljs');
 
 import db from '../../../../data/db';
-import {
-  getSession
-} from 'next-auth/client';
+import { getSession } from 'next-auth/client';
 
 const userDirectory = path.join(process.cwd(), 'data/users');
 const compositionsDirectory = path.join(userDirectory, 'compositions');
@@ -41,51 +39,35 @@ function getSequenceComposition(action1, action2) {
 }
 
 async function ConvertAgnosticCompositionIntoJSCode(compositionName, user) {
-
   return await db.task((t) => {
     return t
-      .one(
-        'SELECT id FROM users WHERE name = $1',
-        user,
-        (a) => a.id
-      )
+      .one('SELECT id FROM users WHERE name = $1', user, (a) => a.id)
       .then((userid) => {
-        return t
-          .one(
-            `SELECT definition 
+        return t.one(
+          `SELECT definition 
           FROM compositions
           WHERE name=$1 and userid=$2`,
-            [compositionName, userid],
-            ({
-              definition
-            }) => ({
-              definition,
-              userid
-            })
-          )
+          [compositionName, userid],
+          ({ definition }) => ({
+            definition,
+            userid,
+          })
+        );
       })
-      .then(async ({
-        definition,
-        userid
-      }) => {
-        const functions = await t
-          .any(
-            `SELECT id, name, description, definition 
+      .then(async ({ definition, userid }) => {
+        const functions = await t.any(
+          `SELECT id, name, description, definition 
           FROM functions
           WHERE userid=$1`,
-            userid
-          );
+          userid
+        );
         return {
           definition: JSON.parse(definition),
           functions,
-          userid
-        }
+          userid,
+        };
       })
-      .then(({
-        definition,
-        functions,
-        userid
-      }) => {
+      .then(({ definition, functions, userid }) => {
         const functionsObj = {};
         functions.forEach((element) => {
           functionsObj[element.id] = element;
@@ -93,54 +75,66 @@ async function ConvertAgnosticCompositionIntoJSCode(compositionName, user) {
         let jsContent = "const composer = require('openwhisk-composer'); ";
         // if its an "If composition"
         if (definition.type == 'ifelse') {
-          jsContent += getIfComposition({
-            name: functionsObj[definition.func[0]].name,
-            definition: functionsObj[definition.func[0]].definition,
-          }, {
-            name: functionsObj[definition.func[1]].name,
-            definition: functionsObj[definition.func[1]].definition,
-          }, {
-            name: functionsObj[definition.func[2]].name,
-            definition: functionsObj[definition.func[2]].definition,
-          }, );
+          jsContent += getIfComposition(
+            {
+              name: functionsObj[definition.func[0]].name,
+              definition: functionsObj[definition.func[0]].definition,
+            },
+            {
+              name: functionsObj[definition.func[1]].name,
+              definition: functionsObj[definition.func[1]].definition,
+            },
+            {
+              name: functionsObj[definition.func[2]].name,
+              definition: functionsObj[definition.func[2]].definition,
+            }
+          );
         } else if (definition.type == 'sequence') {
-          jsContent += getSequenceComposition({
-            name: functionsObj[definition.func[0]].name,
-            definition: functionsObj[definition.func[0]].definition,
-          }, {
-            name: functionsObj[definition.func[1]].name,
-            definition: functionsObj[definition.func[1]].definition,
-          }, );
+          jsContent += getSequenceComposition(
+            {
+              name: functionsObj[definition.func[0]].name,
+              definition: functionsObj[definition.func[0]].definition,
+            },
+            {
+              name: functionsObj[definition.func[1]].name,
+              definition: functionsObj[definition.func[1]].definition,
+            }
+          );
         }
         // if its an "sequence composition"
         // TODO: sequence code
         // Save the IBM specific JS into a file for later use
-        const ibmCompositionJsfilePath = path.join(compositionsDirectory, `${compositionName}.js`);
+        const ibmCompositionJsfilePath = path.join(
+          compositionsDirectory,
+          `${compositionName}.js`
+        );
         fs.writeFileSync(ibmCompositionJsfilePath, jsContent);
         return ibmCompositionJsfilePath;
       })
       .catch((error) => {
         console.log('ERROR: ', error);
-        res.statusCode = 500;
-        return res.send('Error in add-function: ', error);
       });
   });
 }
 
 export default async (req, res) => {
   const {
-    query: {
-      compositionName
-    },
+    query: { compositionName },
   } = req;
   const session = await getSession({
-    req
+    req,
   });
   // convert from agnostic to ibm specific JS composition representation
-  const ibmCompositionJsfilePath = await ConvertAgnosticCompositionIntoJSCode(compositionName, session.user.name);
+  const ibmCompositionJsfilePath = await ConvertAgnosticCompositionIntoJSCode(
+    compositionName,
+    session.user.name
+  );
 
   // convert the JS into JSON IBM specific representation with the compose cmd line
-  const ibmCompositionJsonfilePath = path.join(compositionsDirectory, `${compositionName}.json`);
+  const ibmCompositionJsonfilePath = path.join(
+    compositionsDirectory,
+    `${compositionName}.json`
+  );
   const cmd = `compose ${ibmCompositionJsfilePath} > ${ibmCompositionJsonfilePath}`;
   shell.exec(cmd, (code, stdout, stderr) => {
     console.log('ibmconvert Exit code:', code);
@@ -153,7 +147,9 @@ export default async (req, res) => {
     } else {
       res.statusCode = 200;
       // return the converted file
-      const convertedFileContent = fs.readFileSync(`${ibmCompositionJsonfilePath}`);
+      const convertedFileContent = fs.readFileSync(
+        `${ibmCompositionJsonfilePath}`
+      );
       res.json(convertedFileContent);
     }
   });
